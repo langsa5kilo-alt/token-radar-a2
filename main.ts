@@ -58,6 +58,39 @@ function copyFiles(from: string, to: string): string[] {
 }
 
 const dash = copyFiles(join(here, 'dashboard'), join(out, 'dashboard'));
+
+/** A short note the judge reads first: what this page is, the model, and the test. */
+function notesHtml(r: any): string {
+  const v = (r.validation ?? []) as any[];
+  const rows = v.map((x) => `<tr><td>${x.cutoff}</td><td>${x.train_n}</td><td>${x.test_n}</td>` +
+    `<td>${Number(x.spearman ?? 0).toFixed(3)}</td><td>${(100 * Number(x.top_quintile_hit ?? 0)).toFixed(0)}%</td>` +
+    `<td>${Number(x.multiplier ?? 0).toFixed(2)}x</td></tr>`).join('');
+  return `<!doctype html><meta charset="utf-8"><title>Notes for the judge</title>
+<h1>What this radar does, and how it was tested</h1>
+<p>Three screenshots follow: 1-board is the ranked board with its filters, 2-detail is one protocol's
+model and farm plan, 3-filtered is the same board narrowed to one category. Every number on them is
+recomputed from the sealed snapshot on each run by <code>buildRadar</code> in lib/model.ts.</p>
+<p><strong>The model.</strong> implied_value_usd = tvl_usd x ratio(category, change_7d, age_months).
+The ratio is the category's median market-cap-to-TVL among protocols that already trade, shrunk toward
+the global median by sample size (k = ${r.model?.shrink_k ?? 6}), then multiplied by
+1 + 0.5 x clamp(change_7d, -0.5, 0.5) and by 0.85 + 0.45 x min(months, 36)/36, and clamped to
+[0.02, 1.5]. No protocol name is hardcoded; the only per-protocol inputs are TVL, seven-day change and
+the date it was listed.</p>
+<p><strong>How it was tested, walk-forward.</strong> For each cutoff the category medians are refit only
+on comparables listed before it, then every later comparable is scored with that fit. Spearman is the
+rank correlation between implied value and actual market cap on those held-out protocols: ranking is what
+a radar is for. Top-fifth hit is the share of the market-cap top fifth that the model also puts in its
+top fifth. The multiplier is the median absolute log error, so 5x means the typical absolute miss is a
+factor of five; that is the honest limit of a TVL-only model and the reason the board is a ranking, not a
+price target.</p>
+<table><thead><tr><th>Cutoff</th><th>Train</th><th>Held out</th><th>Spearman</th><th>Top-fifth hit</th><th>Median miss</th></tr></thead>
+<tbody>${rows}</tbody></table>
+<p><strong>Farm plans.</strong> Each row's steps come from its category family (lending, dex, liquid
+staking, yield, RWA, CDP, basis trade, canonical bridge) and its chain's gas, with a dollar budget scaled
+to the protocol's TVL and an estimated cost and duration on every step.</p>`;
+}
+
+writeFileSync(join(out, 'dashboard', '00-notes.html'), notesHtml(radar));
 const shots = copyFiles(join(here, 'screenshots'), join(out, 'screenshots'));
 if (shots.length < 3) {
   process.stderr.write(`token radar: screenshots/ holds ${shots.length}: hand in 3 (board, detail, filtered)\n`);

@@ -378,12 +378,36 @@ export function scoreProtocol(p: SnapshotProtocol, set: CompSet, asOf: string): 
 }
 
 /** Walk-forward validation: train on comparables listed before each cutoff, score those listed on or after. */
+/** Spearman rank correlation; ties share the average rank. */
+export function spearman(a: number[], b: number[]): number {
+  const n = Math.min(a.length, b.length);
+  if (n < 3) return 0;
+  const rank = (v: number[]) => {
+    const order = v.map((x, i) => [x, i]).sort((p, q) => p[0] - q[0]);
+    const r = new Array(v.length).fill(0);
+    for (let i = 0; i < order.length;) {
+      let j = i; while (j + 1 < order.length && order[j + 1][0] === order[i][0]) j += 1;
+      const avg = (i + j) / 2 + 1;
+      for (let x = i; x <= j; x += 1) r[order[x][1]] = avg;
+      i = j + 1;
+    }
+    return r;
+  };
+  const ra = rank(a), rb = rank(b);
+  const ma = ra.slice(0, n).reduce((s, x) => s + x, 0) / n, mb = rb.slice(0, n).reduce((s, x) => s + x, 0) / n;
+  let num = 0, da = 0, db = 0;
+  for (let i = 0; i < n; i += 1) { const x = ra[i] - ma, y = rb[i] - mb; num += x * y; da += x * x; db += y * y; }
+  return da && db ? num / Math.sqrt(da * db) : 0;
+}
+
 export function walkForward(snapshot: Snapshot, cutoffs: string[] = CUTOFFS): ValidationRow[] {
   const out: ValidationRow[] = [];
   for (const cutoff of cutoffs) {
     const train = compsWithCategory(snapshot, cutoff);
     const set = compSet(train);
     const errors: number[] = [];
+    const preds: number[] = [];
+    const acts: number[] = [];
     let lowN = 0;
     const held = new Set<string>();
     const scored = new Set<string>();
@@ -399,7 +423,15 @@ export function walkForward(snapshot: Snapshot, cutoffs: string[] = CUTOFFS): Va
       scored.add(p.slug);
       const predicted = p.tvl_usd * s.ratio_used;
       errors.push(Math.abs(Math.log(p.mcap_usd as number) - Math.log(predicted)));
+      preds.push(predicted);
+      acts.push(p.mcap_usd as number);
     }
+    const rho = spearman(preds, acts);
+    const k = Math.max(1, Math.round(preds.length * 0.2));
+    const topPred = new Set(preds.map((v, i) => [v, i]).sort((x, y) => y[0] - x[0]).slice(0, k).map(([, i]) => i));
+    const topAct = new Set(acts.map((v, i) => [v, i]).sort((x, y) => y[0] - x[0]).slice(0, k).map(([, i]) => i));
+    let hit = 0; for (const i of topPred) if (topAct.has(i)) hit += 1;
+    const topHit = k > 0 ? hit / k : 0;
     errors.sort((a, b) => a - b);
     const m = median(errors);
     out.push({
@@ -409,6 +441,8 @@ export function walkForward(snapshot: Snapshot, cutoffs: string[] = CUTOFFS): Va
       med_abs_log_error: Number.isFinite(m) ? m : 0,
       multiplier: Number.isFinite(m) ? Math.exp(m) : 0,
       categories_low_n: lowN,
+      spearman: Number.isFinite(rho) ? rho : 0,
+      top_quintile_hit: Number(topHit.toFixed(3)),
       scored_n: scored.size,
       held_n: held.size,
     });
