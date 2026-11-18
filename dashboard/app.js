@@ -126,6 +126,7 @@
     return null;
   }
 
+  var TOK = { 1: 'wrapper', 2: 'stable', 3: 'staked', 4: 'exchange' };
   var state = { q: '', cat: 'all', watch: false, below: false, sort: 'implied', dir: -1, sel: null };
 
   var CATS = (function () {
@@ -224,7 +225,7 @@
       var cls = c === null ? 'muted' : c > 0 ? 'up' : c < 0 ? 'down' : 'muted';
       return '<tr data-slug="' + esc(r.slug) + '"' + (r.slug === state.sel ? ' class="sel"' : '') + ' tabindex="0">' +
         '<td class="num rank">' + r.rank + '</td>' +
-        '<td class="name">' + esc(r.name) + (r.on_watchlist ? '<span class="pill wl">watch</span>' : '') + (r.flag === 2 ? '<span class="pill">sub-floor</span>' : '') + '</td>' +
+        '<td class="name">' + esc(r.name) + (r.on_watchlist ? '<span class="pill wl">watch</span>' : '') + (r.token_hint ? '<span class="pill tok" title="the snapshot leaves the symbol empty, but this protocol already trades">' + TOK[r.token_hint] + '</span>' : '') + (r.flag === 2 ? '<span class="pill">sub-floor</span>' : '') + '</td>' +
         '<td class="cat">' + esc(cat(r)) + '</td>' +
         '<td class="cat">' + esc(firstChain(r)) + (r.chains.length > 1 ? ' <span class="muted">+' + (r.chains.length - 1) + '</span>' : '') + '</td>' +
         '<td class="num">' + usd(r.tvl_usd) + '</td>' +

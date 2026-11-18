@@ -108,6 +108,22 @@ export interface ValidationRow {
   held_n: number;
 }
 
+
+/** The snapshot's symbol field is empty for many protocols that plainly trade already: a wrapped
+ *  bitcoin, a staked ether, a stablecoin, an exchange. The board names them instead of pretending. */
+export type TokenStatus = 'pre-token' | 'wrapper' | 'stable' | 'staked' | 'exchange';
+
+const EXCHANGES = /^(binance|coinbase|bybit|bitfinex|robinhood|kraken|okx|kucoin|gate|htx|upbit|bithumb|bitget|mexc|deribit)/i;
+
+export function tokenHint(name: string, category: string | null): TokenStatus {
+  const n = name.toLowerCase();
+  if (category === 'CEX' || EXCHANGES.test(n)) return 'exchange';
+  if (/stable|usd|tether|dai\b/.test(n)) return 'stable';
+  if (/stak|restak|\b(steth|reth|cbeth|wsteth)\b|liquid staking/.test(n)) return 'staked';
+  if (/wrap|bridged|\bwbtc\b|\bweth\b|binance-bitcoin|binance-staked/.test(n)) return 'wrapper';
+  return 'pre-token';
+}
+
 export interface BoardRow {
   rank: number;
   tier: number;
@@ -121,7 +137,7 @@ export interface BoardRow {
   listed_at: string | null;
   gecko_id: null;
   symbol: null;
-  token_status: 'pre-token';
+  token_status: TokenStatus;
   on_watchlist: boolean;
   flag: 'watchlist' | 'below floor' | '';
   age_months: number | null;
@@ -692,7 +708,7 @@ export function buildBoard(snapshot: Snapshot): BoardRow[] {
       listed_at: p.listed_at,
       gecko_id: null,
       symbol: null,
-      token_status: 'pre-token',
+      token_status: tokenHint(p.name, p.category),
       on_watchlist: watch.has(p.slug),
       age_months: monthsBetween(snapshot.as_of, p.listed_at),
       implied_value_usd: s.implied_value_usd,
@@ -932,7 +948,7 @@ export function boardIssue(board: BoardRow[], snapshot: Snapshot): string | null
  */
 export const COLUMNS = [
   'rank', 'name', 'category', 'chains', 'tvl_usd', 'change_7d', 'age_months',
-  'implied_value_usd', 'ratio_used', 'comps_n', 'flag',
+  'implied_value_usd', 'ratio_used', 'comps_n', 'flag', 'token_hint',
 ] as const;
 
 /**
@@ -995,6 +1011,7 @@ export function compactData(radar: RadarData): Record<string, unknown> {
       ratio_used: cut(r.ratio_used, 4),
       comps_n: r.comps_n,
       flag: r.flag === 'watchlist' ? 1 : r.flag === 'below floor' ? 2 : 0,
+      token_hint: ({ 'pre-token': 0, wrapper: 1, stable: 2, staked: 3, exchange: 4 } as Record<string, number>)[r.token_status] ?? 0,
     };
     return COLUMNS.map((k) => fields[k] ?? null);
   });

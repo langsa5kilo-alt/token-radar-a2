@@ -51,6 +51,7 @@ td.name{font-weight:600}
 td.cat{color:var(--ink2)}
 .pill{display:inline-block;font-size:10px;line-height:1;padding:3px 5px;margin-left:5px;border:1px solid var(--line);color:var(--ink3)}
 .pill.wl{border-color:var(--acc);color:var(--acc)}
+.pill.tok{border-style:dashed}
 td.value{font-weight:700;color:var(--acc)}
 .up{color:var(--good)}
 .down{color:var(--bad)}

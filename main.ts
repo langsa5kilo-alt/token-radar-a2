@@ -85,6 +85,11 @@ factor of five; that is the honest limit of a TVL-only model and the reason the 
 price target.</p>
 <table><thead><tr><th>Cutoff</th><th>Train</th><th>Held out</th><th>Spearman</th><th>Top-fifth hit</th><th>Median miss</th></tr></thead>
 <tbody>${rows}</tbody></table>
+<p><strong>Rows that already trade.</strong> The snapshot leaves the symbol empty for some protocols
+that plainly have a token: a wrapped bitcoin, a staked ether, a stablecoin, an exchange. The board does
+not hide them, because the watchlist is the floor, but each carries a dashed pill saying wrapper, stable,
+staked or exchange, so a reader knows which rows are pre-token in the snapshot's sense and which are
+pre-token in fact.</p>
 <p><strong>Farm plans.</strong> Each row's steps come from its category family (lending, dex, liquid
 staking, yield, RWA, CDP, basis trade, canonical bridge) and its chain's gas, with a dollar budget scaled
 to the protocol's TVL and an estimated cost and duration on every step.</p>`;
