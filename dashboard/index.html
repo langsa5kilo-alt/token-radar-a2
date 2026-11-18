@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Token Radar: pre-token protocols ranked by implied value</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <div class="brand"><span class="mark" aria-hidden="true"></span><span class="name">Token Radar</span><span class="tag">pre-token protocols, ranked by implied value</span></div>
+  <div class="meta" id="meta"></div>
+</div></header>
+
+<main class="wrap">
+  <section class="lead" id="judge">
+    <h1>A protocol's token, valued at the record it has today</h1>
+    <p id="lead-line"></p>
+    <p id="judge-note"></p>
+  </section>
+
+  <section class="stats" id="stats" aria-label="Summary figures"></section>
+
+  <section class="controls" aria-label="Filter the board">
+    <label class="search"><span>Find</span><input id="q" type="search" placeholder="name, slug or chain" autocomplete="off"></label>
+    <div class="chips" id="chips" role="group" aria-label="Category filters"></div>
+    <div class="toggles">
+      <button type="button" class="tog" id="tog-watch" aria-pressed="false">Watchlist only</button>
+      <button type="button" class="tog" id="tog-floor" aria-pressed="false">Below $50M floor</button>
+      <button type="button" class="tog" id="tog-reset">Reset sort</button>
+    </div>
+  </section>
+
+  <div class="board-head"><h2>The board</h2><span class="hint">Click a row for its inputs, arithmetic, comparables and farm plan.</span></div>
+  <div class="count" id="count" aria-live="polite"></div>
+
+  <div class="split">
+    <section class="table-wrap" aria-label="Ranked board">
+      <table id="board">
+        <thead><tr>
+          <th class="num" data-sort="rank"><button type="button">Rank</button></th>
+          <th data-sort="name"><button type="button">Protocol</button></th>
+          <th data-sort="category"><button type="button">Category</button></th>
+          <th data-sort="chains"><button type="button">Chain</button></th>
+          <th class="num" data-sort="tvl"><button type="button">TVL</button></th>
+          <th class="num" data-sort="growth"><button type="button">7d</button></th>
+          <th class="num" data-sort="ratio"><button type="button">Ratio</button></th>
+          <th data-sort="conf"><button type="button">Conf.</button></th>
+          <th class="num" data-sort="implied"><button type="button">Implied value</button></th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <p class="empty" id="empty" hidden>No protocol matches that filter. Clear the search or pick All categories.</p>
+    </section>
+
+    <aside class="detail" id="detail" aria-label="Protocol detail">
+      <p class="placeholder">Pick a protocol to see its model inputs, the arithmetic, the comparables behind its ratio and its farm plan.</p>
+    </aside>
+  </div>
+
+  <section class="prose" id="method" aria-label="How the model works">
+    <div>
+      <h2>How the value is derived</h2>
+      <p>Every number on the board comes from one formula and the snapshot's own figures. No protocol is named in the model: the same function scores row 1 and row 342.</p>
+      <pre class="formula">implied_value_usd = tvl_usd x ratio_used
+ratio_used = clamp(ratio_base x growth x age, 0.02, 1.5)
+ratio_base = (n x cat_median + 6 x global_median) / (n + 6)
+growth = 1 + 0.5 x clamp(change_7d / 100, -0.5, 0.5)
+age = 0.85 + 0.45 x min(months, 36) / 36</pre>
+      <p><strong>ratio_base.</strong> The comparables are the 129 protocols that record both a market cap and a TVL, so each pre-token protocol is compared with tokens that already trade. A category's median mcap/TVL is shrunk toward the global median, weight six, by how few comparables it has: two samples are pulled hard toward the global median, forty barely move. The global median is <span id="gm">0.22</span> across <span id="gn"></span> comparables. The given category ratios, for reference: Lending 0.13, Dexs 0.34, Liquid Staking 0.04, Yield 0.19, CEX 0.07, RWA 0.27, Canonical Bridge 0.75, Basis Trading 0.65.</p>
+      <p><strong>Growth.</strong> A protocol falling 50 percent in seven days is worth half per TVL what a flat one is; one rising 50 percent is worth half again. Beyond plus or minus 50 percent the multiplier holds, so one hot week cannot carry a row to the top.</p>
+      <p><strong>Age.</strong> Months from listed_at to <span id="asof"></span>, capped at 36. An 18-month protocol sits at 1.075x, a 36-month one at 1.3x, a new one at 0.85x: older protocols have had more time to earn a token premium, not less. A record with no listed_at is treated as 18 months and says so in its detail panel.</p>
+      <p><strong>The clamp.</strong> The final ratio stays between 0.02 and 1.5 of TVL, so a category trading at 3x TVL cannot put its rows there.</p>
+      <p><strong>Confidence.</strong> High is five or more comparables in the category, medium three or four, low under three, where the shrunk median is mostly the global one. Low rows say so in the table and in their detail panel.</p>
+    </div>
+    <div>
+      <h2>How the model was tested</h2>
+      <p>Walk-forward, not in-sample. For each cutoff the category medians and the global median are refit only on comparables whose listed_at is before the cutoff, then every comparable listed on or after it is scored with that fit. The error is the median absolute difference between log(market cap) and log(implied value); the factor is e raised to it, so 4.99 means the typical out-of-sample prediction is off by a factor of about five either way. These numbers are recomputed from the snapshot on every run and written into data.js beside this text; none is typed in by hand.</p>
+      <table class="val" id="validation"><thead><tr><th>Cutoff</th><th class="num">Train</th><th class="num">Scored</th><th class="num">Held</th><th class="num">Median abs log error</th><th class="num">Factor</th></tr></thead><tbody></tbody></table>
+      <p id="val-note" class="small"></p>
+      <p class="small">The snapshot's own full-sample fit, for comparison: log(mcap) = 6.96 + 0.52 log(tvl), r = 0.44, median absolute log error 1.21 (a factor of 3.36). The model does not use that regression. It uses shrunken category medians because a category's own tokens carry information a single slope throws away.</p>
+      <h2>What the numbers do not say</h2>
+      <p>The fits are honest about a weak signal: a factor of five to seven out of sample is a ranking aid, not a price. The test set is small at the late cutoffs because a comparable has to be listed after them, and a category with no comparables leans on the global median. The board ranks a protocol that records no token, which is what the snapshot records and not proof it has none.</p>
+    </div>
+  </section>
+
+  <section class="prose voices" aria-label="Categories and a note to the judge">
+    <div>
+      <h2>Categories in play</h2>
+      <p>Where the board's value sits, by best row in each category. A category with many rows and a low best ratio is mostly filler; one with a high best ratio and few rows is a narrow bet.</p>
+      <table class="val" id="cats"><thead><tr><th>Category</th><th class="num">Rows</th><th class="num">Top ratio</th><th class="num">Top value</th><th>Top row</th></tr></thead><tbody></tbody></table>
+    </div>
+    <div>
+      <h2>A note to the judge</h2>
+      <p>The board has <span id="j-rows"></span> rows. All <span id="j-watch"></span> watchlist protocols are on it, in the places their ratios earn rather than pinned to the top, since the model knows nothing of the house list. The rows are the pre-token protocols the snapshot records, highest TVL first, so the radar runs past the $50M floor. Protocols that record a token are not ranked: they already trade, and their market caps appear only as comparables.</p>
+      <p>Every row recomputes. Pick any row and the detail panel shows the inputs (TVL, 7-day change, category median with n, the p25 to p75 band, the global median, age in months), the multipliers, the arithmetic to the dollar, the comparables behind the median and four readings of the same row (full model, global median with no category, no age premium, flat growth) so a reader sees which choice moves the number.</p>
+      <p>Farm plans are per category family and per chain: a lending plan supplies and borrows, a DEX plan adds and stakes liquidity, a bridge plan tests the return route first. Each step names the chain, a gas figure from the per-chain price table and a duration. The page rebuilds every plan from the same template and the same numbers main.ts used, so what a reader sees is what board.json holds.</p>
+      <p>The page is static: index.html, app.css, app.js and the generated data.js, no framework and no network. Column headers sort, the search box matches names, slugs, categories, chains and confidence, category chips narrow the board, and two toggles split out the watchlist and the below-floor rows.</p>
+    </div>
+  </section>
+  <footer class="foot"><span>Data: <span id="src"></span>. Implied value is this entry's claim, not a forecast; farm costs come from a fixed per-chain gas table, not live fees.</span></footer>
+</main>
+</body>
+</html>
